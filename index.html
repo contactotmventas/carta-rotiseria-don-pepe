@@ -165,10 +165,25 @@
     text-transform:uppercase; color:#7de8a6; opacity:.85;
   }
 
+    .mozo-fab{position:fixed;right:14px;bottom:16px;z-index:60;display:flex;flex-direction:column;gap:8px;align-items:flex-end}
+    .mozo-btn{border:0;border-radius:999px;padding:14px 20px;font:600 15px/1 system-ui,sans-serif;color:#fff;
+      background:#1d7a4d;box-shadow:0 6px 20px rgba(0,0,0,.28);cursor:pointer;display:flex;align-items:center;gap:8px}
+    .mozo-btn.sec{background:#2b3a46;font-size:14px;padding:11px 16px}
+    .mozo-btn:disabled{opacity:.55}
+    .mozo-ok{background:#0f5132}
+    .mozo-msg{background:#fff;color:#123;border-radius:12px;padding:10px 14px;font:500 13.5px/1.35 system-ui,sans-serif;
+      box-shadow:0 6px 20px rgba(0,0,0,.22);max-width:250px;display:none}
+    .mozo-mesa{font:500 12px/1 system-ui,sans-serif;color:#fff;background:rgba(0,0,0,.55);border-radius:999px;padding:5px 10px}
 </style>
 </head>
 <body>
 
+    <div class="mozo-fab">
+      <div class="mozo-msg" id="mozoMsg"></div>
+      <span class="mozo-mesa" id="mozoMesa" style="display:none"></span>
+      <button class="mozo-btn sec" id="mozoCuenta" onclick="llamar('cuenta')">🧾 Pedir la cuenta</button>
+      <button class="mozo-btn" id="mozoMozo" onclick="llamar('mozo')">🔔 Llamar al mozo</button>
+    </div>
   <!-- PORTADA: pantalla de bienvenida con los 3 botones -->
   <div id="portada" class="portada">
     <div class="portada-cap">
@@ -256,6 +271,57 @@
     window.scrollTo(0, 0);
   }
 
+  var MOZO_URL = "https://buzon-tmventas.contacto-tmventas.workers.dev", MOZO_LOCAL = "714sb3rgzg6aqio9x9";
+  function mesaActual(){
+    try{
+      var p = new URLSearchParams(location.search).get("mesa");
+      if (p) { localStorage.setItem("tmv_mesa", p); return p; }
+      return localStorage.getItem("tmv_mesa") || "";
+    }catch(e){ return ""; }
+  }
+  function mostrarMesa(){
+    var m = mesaActual(), el = document.getElementById("mozoMesa");
+    if (el && m) { el.textContent = "Mesa " + m; el.style.display = "inline-block"; }
+  }
+  function mozoAviso(txt, ms){
+    var el = document.getElementById("mozoMsg");
+    if (!el) return;
+    el.textContent = txt; el.style.display = "block";
+    clearTimeout(window._mozoT);
+    window._mozoT = setTimeout(function(){ el.style.display = "none"; }, ms || 4500);
+  }
+  function llamar(tipo){
+    var mesa = mesaActual();
+    if (!mesa) {
+      mesa = (prompt("¿En qué mesa estás? Escribí el número:") || "").trim();
+      if (!mesa) return;
+      try{ localStorage.setItem("tmv_mesa", mesa); }catch(e){}
+      mostrarMesa();
+    }
+    var b = document.getElementById(tipo === "cuenta" ? "mozoCuenta" : "mozoMozo");
+    var textoOriginal = b ? b.innerHTML : "";
+    if (b) { b.disabled = true; b.innerHTML = "Avisando…"; }
+    fetch(MOZO_URL + "/llamar", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ local: MOZO_LOCAL, mesa: mesa, tipo: tipo })
+    }).then(function(r){ return r.json(); }).then(function(j){
+      if (j && j.ok) {
+        if (b) { b.classList.add("mozo-ok"); b.innerHTML = "✓ Avisado"; }
+        mozoAviso(tipo === "cuenta" ? "Listo, ya avisamos que pedís la cuenta." : "Listo, el mozo ya fue avisado. Ahí va.");
+        setTimeout(function(){ if (b) { b.disabled = false; b.classList.remove("mozo-ok"); b.innerHTML = textoOriginal; } }, 30000);
+      } else if (j && j.error === "demasiados-llamados") {
+        if (b) { b.disabled = false; b.innerHTML = textoOriginal; }
+        mozoAviso("Hubo muchos llamados seguidos. Esperá un momento o avisale a un mozo.");
+      } else {
+        if (b) { b.disabled = false; b.innerHTML = textoOriginal; }
+        mozoAviso("No pudimos avisar desde acá. Llamá a un mozo con la mano.");
+      }
+    }).catch(function(){
+      if (b) { b.disabled = false; b.innerHTML = textoOriginal; }
+      mozoAviso("Sin conexión para avisar. Llamá a un mozo con la mano.");
+    });
+  }
+  mostrarMesa();
 </script>
 </body>
 </html>
