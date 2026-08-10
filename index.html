@@ -205,6 +205,10 @@
     .ped-aviso{border-radius:10px;padding:10px 12px;font-size:14px;margin-bottom:10px;display:none}
     .ped-aviso.err{background:#fdecec;color:#8f2020;display:block}
     .ped-aviso.ok{background:#e8f6ee;color:#14663c;display:block}
+    .ped-alias{background:#eef4ff;border:1px solid #cfdcf7;border-radius:10px;padding:10px 12px;margin-bottom:8px;font-size:13.5px;color:#1d3a63}
+    .ped-alias b{font-size:16px;display:block;margin:3px 0;word-break:break-all}
+    .ped-alias button{border:0;background:#1d3a63;color:#fff;border-radius:8px;padding:7px 12px;font-size:13px;cursor:pointer}
+    .ped-gratis{color:#14663c;font-weight:600}
 </style>
 </head>
 <body>
@@ -237,6 +241,13 @@
             <label class="ped-f"><span>Direcci&oacute;n *</span><input id="pedDir" placeholder="Calle 1234, timbre 2" autocomplete="street-address"></label>
             
           </div>
+          <label class="ped-f"><span>&iquest;C&oacute;mo pag&aacute;s?</span>
+            <select id="pedPago" onchange="pedPintar()">
+              <option value="efectivo">Efectivo</option>
+              <option value="transferencia">Transferencia</option>
+              <option value="tarjeta">Tarjeta (llev&aacute; el posnet)</option>
+            </select></label>
+          <div id="pedPagoExtra"></div>
           <label class="ped-f"><span>Aclaraciones (opcional)</span><textarea id="pedNota" rows="2" placeholder="sin sal, timbre roto&hellip;"></textarea></label>
           <button class="ped-enviar" id="pedEnviarBtn" onclick="pedEnviar()">Mandar el pedido</button>
         </div>
@@ -337,16 +348,26 @@
   }
 
   var MOZO_URL = "https://buzon-tmventas.contacto-tmventas.workers.dev", MOZO_LOCAL = "714sb3rgzg6aqio9x9";
-  function mesaActual(){
-    try{
-      var p = new URLSearchParams(location.search).get("mesa");
-      if (p) { localStorage.setItem("tmv_mesa", p); return p; }
-      return localStorage.getItem("tmv_mesa") || "";
-    }catch(e){ return ""; }
+  // La mesa vale SOLO si viene en la direccion, o sea si se escaneo el QR de esa
+  // mesa. Antes quedaba guardada en el telefono para siempre: el que abria la
+  // carta que le mandaron por WhatsApp veia "Mesa 4" desde su casa, y -mucho
+  // peor- el cliente que ayer se sento en la 4 y hoy esta en la 9 llamaba al
+  // mozo A LA MESA EQUIVOCADA.
+  function mesaDelQR(){
+    // El buzon limpia el numero igual que aca, asi lo que se ve en pantalla es
+    // exactamente lo que le llega al mozo.
+    try{ return String(new URLSearchParams(location.search).get("mesa") || "").replace(/[^0-9A-Za-z- ]/g,"").slice(0,10).trim(); }
+    catch(e){ return ""; }
   }
+  // NO se guarda ningun numero de mesa en el telefono. Se probo hacerlo y es
+  // peor: al que abria la carta sin QR le aparecia el numero de la otra vez ya
+  // escrito, tocaba "Aceptar" sin leer, y el mozo iba a la mesa equivocada.
   function mostrarMesa(){
-    var m = mesaActual(), el = document.getElementById("mozoMesa");
-    if (el && m) { el.textContent = "Mesa " + m; el.style.display = "inline-block"; }
+    // El cartelito de la mesa solo se muestra si se escaneo el QR de la mesa.
+    var m = mesaDelQR(), el = document.getElementById("mozoMesa");
+    if (!el) return;
+    if (m) { el.textContent = "Mesa " + m; el.style.display = "inline-block"; }
+    else { el.textContent = ""; el.style.display = "none"; }
   }
   function mozoAviso(txt, ms){
     var el = document.getElementById("mozoMsg");
@@ -356,12 +377,22 @@
     window._mozoT = setTimeout(function(){ el.style.display = "none"; }, ms || 4500);
   }
   function llamar(tipo){
-    var mesa = mesaActual();
+    var mesa = mesaDelQR();
     if (!mesa) {
-      mesa = (prompt("¿En qué mesa estás? Escribí el número:") || "").trim();
-      if (!mesa) return;
-      try{ localStorage.setItem("tmv_mesa", mesa); }catch(e){}
-      mostrarMesa();
+      var escrito = null;
+      // El casillero arranca VACIO a proposito: que lo escriba quien esta sentado.
+      try{ escrito = prompt("¿En qué mesa estás? Escribí el número:", ""); }catch(e){ escrito = null; }
+      mesa = String(escrito == null ? "" : escrito).replace(/[^0-9A-Za-z- ]/g,"").slice(0,10).trim();
+      if (!mesa) {
+        // Si se arrepintio o el navegador bloqueo la pregunta, se lo dice: antes
+        // el boton no hacia nada y el cliente tocaba cinco veces al pedo.
+        mozoAviso(escrito === null
+          ? "Para avisarle al mozo necesito saber en qué mesa estás. Escaneá el QR de tu mesa."
+          : "Escribí el número de tu mesa para poder avisarle al mozo.", 6000);
+        return;
+      }
+      var elm = document.getElementById("mozoMesa");
+      if (elm) { elm.textContent = "Mesa " + mesa; elm.style.display = "inline-block"; }
     }
     var b = document.getElementById(tipo === "cuenta" ? "mozoCuenta" : "mozoMozo");
     var textoOriginal = b ? b.innerHTML : "";
@@ -391,8 +422,24 @@
   var PED_URL = "https://buzon-tmventas.contacto-tmventas.workers.dev", PED_LOCAL = "714sb3rgzg6aqio9x9";
   var PED_LOCALNOM = "Don Pepe";
   var PED_PROD = [{"n":"hamburguesa","p":3000},{"n":"burrito","p":2000},{"n":"pizza","p":11000}], PED_ZONAS = [];
+  var PED_ENVIO_DEF = 1000, PED_GRATIS_DESDE = 0;
+  var PED_ALIAS = "donpepe";
   var pedCarro = {};
-  function pedAbrir(){ document.getElementById("pedCap").classList.add("on"); pedPintar(); }
+  function pedAbrir(){
+    // Si el cartel quedo en "listo" de un pedido anterior, se vuelve a armar el
+    // formulario: antes, el que se acordaba de las bebidas abria de nuevo y se
+    // encontraba con la pantalla vacia, y esa venta se perdia.
+    var paso1 = document.getElementById("pedPaso1");
+    if (paso1 && paso1.style.display === "none") {
+      paso1.style.display = "block";
+      pedCarro = {}; _pedPagoPintado = null;
+      pedAviso("");
+      var b = document.getElementById("pedEnviarBtn");
+      if (b) { b.disabled = false; b.textContent = "Mandar el pedido"; }
+    }
+    document.getElementById("pedCap").classList.add("on");
+    pedPintar();
+  }
   function pedCerrar(){ document.getElementById("pedCap").classList.remove("on"); }
   function pedAviso(t, tipo){
     var e = document.getElementById("pedAviso");
@@ -409,12 +456,54 @@
   }
   function pedIndice(n){ for (var i=0;i<PED_PROD.length;i++) if (PED_PROD[i].n===n) return i; return -1; }
   function pedPrecio(n){ for (var i=0;i<PED_PROD.length;i++) if (PED_PROD[i].n===n) return PED_PROD[i].p; return 0; }
+  function pedSubtotal(){
+    var t = 0;
+    for (var n in pedCarro) t += pedPrecio(n) * pedCarro[n];
+    return t;
+  }
+  // EXACTAMENTE la misma cuenta que hace la computadora del comercio:
+  //   sin envio -> 0
+  //   pasa el minimo de envio gratis -> 0
+  //   la zona tiene precio propio -> ese
+  //   si no -> el envio de siempre del comercio
   function pedEnvioActual(){
     if (document.getElementById("pedEntrega").value !== "envio") return 0;
+    if (PED_GRATIS_DESDE > 0 && pedSubtotal() >= PED_GRATIS_DESDE) return 0;
     var s = document.getElementById("pedZona");
-    if (!s || !s.value) return 0;
-    for (var i=0;i<PED_ZONAS.length;i++) if (PED_ZONAS[i].id===s.value) return PED_ZONAS[i].envio;
-    return 0;
+    if (s && s.value) {
+      for (var i=0;i<PED_ZONAS.length;i++) if (PED_ZONAS[i].id===s.value && PED_ZONAS[i].envio > 0) return PED_ZONAS[i].envio;
+    }
+    return PED_ENVIO_DEF;
+  }
+  var _pedPagoPintado = null;
+  function pedPintarPago(){
+    var sel = document.getElementById("pedPago"), caja = document.getElementById("pedPagoExtra");
+    if (!sel || !caja) return;
+    var v = sel.value, total = pedSubtotal() + pedEnvioActual();
+    // Se vuelve a dibujar SOLO si cambio la forma de pago. Antes se redibujaba
+    // en cada toque (agregar un producto, cambiar la zona) y le borraba al
+    // cliente el monto con el que iba a pagar: el repartidor salia sin vuelto.
+    if (_pedPagoPintado === v) {
+      var inp = document.getElementById("pedVuelto");
+      if (inp && total > 0) inp.placeholder = "ej: " + Math.round(Math.ceil((total+1)/1000)*1000);
+      return;
+    }
+    _pedPagoPintado = v;
+    if (v === "transferencia") {
+      caja.innerHTML = PED_ALIAS
+        ? '<div class="ped-alias">Transfer&iacute; a este alias y mand&aacute; el comprobante por WhatsApp:<b id="pedAliasTxt">'+pedEsc(PED_ALIAS)+'</b>'+
+          '<button type="button" onclick="pedCopiarAlias()">Copiar el alias</button></div>'
+        : '<div class="ped-alias">Cuando confirmemos el pedido te pasamos los datos para la transferencia.</div>';
+    } else if (v === "efectivo") {
+      caja.innerHTML = '<label class="ped-f"><span>&iquest;Con cu&aacute;nto pag&aacute;s? (para llevarte el vuelto)</span>'+
+        '<input id="pedVuelto" inputmode="numeric" placeholder="'+(total>0?"ej: "+Math.round(Math.ceil((total+1)/1000)*1000):"ej: 20000")+'"></label>';
+    } else {
+      caja.innerHTML = '<div class="ped-alias">El repartidor va con el posnet. Si no llega a andar la se&ntilde;al, tené efectivo a mano.</div>';
+    }
+  }
+  function pedCopiarAlias(){
+    try{ navigator.clipboard.writeText(PED_ALIAS); pedAviso("Alias copiado.", "ok"); }
+    catch(e){ pedAviso("Copialo a mano: " + PED_ALIAS, "ok"); }
   }
   function pedPintar(){
     var q = pedNorm((document.getElementById("pedBuscar")||{}).value);
@@ -434,15 +523,25 @@
       c += '<div class="rg"><span>'+cant+' &times; '+pedEsc(n)+'</span><span>$'+Math.round(imp)+
            ' <button type="button" onclick="pedMas('+pedIndice(n)+',-1)">&minus;</button></span></div>';
     }
+    var esEnvio = document.getElementById("pedEntrega").value === "envio";
     var env = pedEnvioActual();
     if (!nombres.length) c = '<div class="rg"><span>Todav&iacute;a no elegiste nada</span></div>';
     else {
-      if (env > 0) c += '<div class="rg"><span>Env&iacute;o</span><span>$'+Math.round(env)+'</span></div>';
+      if (esEnvio) {
+        // El envio se muestra SIEMPRE que sea a domicilio: si es gratis lo dice,
+        // y si no, lo cobra. Antes, si el comercio no tenia zonas cargadas, el
+        // cliente veia un total sin envio y despues le cobraban de mas.
+        c += env > 0
+          ? '<div class="rg"><span>Env&iacute;o</span><span>$'+Math.round(env)+'</span></div>'
+          : '<div class="rg"><span>Env&iacute;o</span><span class="ped-gratis">gratis</span></div>';
+        if (PED_GRATIS_DESDE > 0 && env > 0)
+          c += '<div class="rg"><span style="font-size:12.5px;color:#5b6672">Te faltan $'+Math.round(PED_GRATIS_DESDE-sub)+' para el env&iacute;o gratis</span><span></span></div>';
+      }
       c += '<div class="ped-tot"><span>Total</span><span>$'+Math.round(sub+env)+'</span></div>';
     }
     document.getElementById("pedCarro").innerHTML = c;
-    document.getElementById("pedEnvio").style.display =
-      document.getElementById("pedEntrega").value === "envio" ? "block" : "none";
+    document.getElementById("pedEnvio").style.display = esEnvio ? "block" : "none";
+    pedPintarPago();
   }
   function pedEnviar(){
     var items = [];
@@ -457,18 +556,34 @@
     if (tel.replace(/\D/g,"").length < 6) return pedAviso("Pon\u00e9 un tel\u00e9fono para que te podamos avisar.");
     if (entrega === "envio" && !dir) return pedAviso("Pon\u00e9 la direcci\u00f3n de entrega.");
     if (entrega === "envio" && zs && PED_ZONAS.length && !zs.value) return pedAviso("Eleg\u00ed tu zona, as\u00ed sabemos cu\u00e1nto sale el env\u00edo.");
+    var pago = (document.getElementById("pedPago")||{}).value || "";
+    var vueltoEl = document.getElementById("pedVuelto");
+    var pagaCon = pago === "efectivo" && vueltoEl ? String(vueltoEl.value||"").replace(/\D/g,"").slice(0,9) : "";
     var b = document.getElementById("pedEnviarBtn");
     b.disabled = true; b.textContent = "Mandando\u2026";
     pedAviso("");
+    // La forma de pago viaja de DOS maneras a proposito: como dato propio (para
+    // los buzones al dia) y como una marca al final de las aclaraciones. Asi
+    // funciona igual con un buzon que todavia no se actualizo, sin que el
+    // comercio tenga que tocar nada en Cloudflare.
+    var marca = "[PAGA: " + pago + (pagaCon ? " con $" + pagaCon : "") + "]";
+    // La aclaracion se recorta ANTES, no despues: si no, una nota larga se comia
+    // la marca y la forma de pago se perdia sin que nadie se enterara.
+    var nota = (document.getElementById("pedNota").value||"").trim().slice(0, 199 - marca.length);
     fetch(PED_URL + "/pedido", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ local: PED_LOCAL, nombre: nombre, telefono: tel, entrega: entrega,
-        direccion: dir, items: items, nota: (document.getElementById("pedNota").value||"").trim(),
+        direccion: dir, items: items,
+        nota: ((nota ? nota + " " : "") + marca).slice(0, 200),
+        pago: pago, pagaCon: pagaCon,
         zonaId: zs ? zs.value : "" })
     }).then(function(r){ return r.json(); }).then(function(j){
       if (j && j.ok) {
         document.getElementById("pedPaso1").style.display = "none";
-        pedAviso("\u00a1Listo! Tu pedido entr\u00f3 en " + PED_LOCALNOM + ". Te avisamos por WhatsApp cuando est\u00e9 en camino.", "ok");
+        var extra = (pago === "transferencia" && PED_ALIAS)
+          ? " Alias para transferir: " + PED_ALIAS
+          : "";
+        pedAviso("\u00a1Listo! Tu pedido entr\u00f3 en " + PED_LOCALNOM + ". Te avisamos por WhatsApp cuando est\u00e9 en camino." + extra, "ok");
       } else if (j && j.error === "demasiados-pedidos") {
         b.disabled = false; b.textContent = "Mandar el pedido";
         pedAviso("Hay muchos pedidos en este momento. Prob\u00e1 en un rato o llamanos.");
