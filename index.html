@@ -165,6 +165,15 @@
     text-transform:uppercase; color:#7de8a6; opacity:.85;
   }
 
+    .mozo-fab{position:fixed;right:14px;bottom:16px;z-index:60;display:flex;flex-direction:column;gap:8px;align-items:flex-end}
+    .mozo-btn{border:0;border-radius:999px;padding:14px 20px;font:600 15px/1 system-ui,sans-serif;color:#fff;
+      background:#1d7a4d;box-shadow:0 6px 20px rgba(0,0,0,.28);cursor:pointer;display:flex;align-items:center;gap:8px}
+    .mozo-btn.sec{background:#2b3a46;font-size:14px;padding:11px 16px}
+    .mozo-btn:disabled{opacity:.55}
+    .mozo-ok{background:#0f5132}
+    .mozo-msg{background:#fff;color:#123;border-radius:12px;padding:10px 14px;font:500 13.5px/1.35 system-ui,sans-serif;
+      box-shadow:0 6px 20px rgba(0,0,0,.22);max-width:250px;display:none}
+    .mozo-mesa{font:500 12px/1 system-ui,sans-serif;color:#fff;background:rgba(0,0,0,.55);border-radius:999px;padding:5px 10px}
 
     .ped-fab{position:fixed;left:14px;bottom:16px;z-index:61}
     .ped-btn{border:0;border-radius:999px;padding:14px 20px;font:600 15px/1 system-ui,sans-serif;color:#fff;
@@ -204,6 +213,12 @@
 </head>
 <body>
 
+    <div class="mozo-fab">
+      <div class="mozo-msg" id="mozoMsg"></div>
+      <span class="mozo-mesa" id="mozoMesa" style="display:none"></span>
+      <button class="mozo-btn sec" id="mozoCuenta" onclick="llamar('cuenta')">🧾 Pedir la cuenta</button>
+      <button class="mozo-btn" id="mozoMozo" onclick="llamar('mozo')">🔔 Llamar al mozo</button>
+    </div>
 
     <div class="ped-fab"><button class="ped-btn" onclick="pedAbrir()"><span>&#128757;</span> Pedir a domicilio</button></div>
     <div class="ped-cap" id="pedCap" onclick="if(event.target===this)pedCerrar()">
@@ -314,6 +329,77 @@
     window.scrollTo(0, 0);
   }
 
+  var MOZO_URL = "https://buzon-tmventas.contacto-tmventas.workers.dev", MOZO_LOCAL = "714sb3rgzg6aqio9x9";
+  // La mesa vale SOLO si viene en la direccion, o sea si se escaneo el QR de esa
+  // mesa. Antes quedaba guardada en el telefono para siempre: el que abria la
+  // carta que le mandaron por WhatsApp veia "Mesa 4" desde su casa, y -mucho
+  // peor- el cliente que ayer se sento en la 4 y hoy esta en la 9 llamaba al
+  // mozo A LA MESA EQUIVOCADA.
+  function mesaDelQR(){
+    // El buzon limpia el numero igual que aca, asi lo que se ve en pantalla es
+    // exactamente lo que le llega al mozo.
+    try{ return String(new URLSearchParams(location.search).get("mesa") || "").replace(/[^0-9A-Za-z- ]/g,"").slice(0,10).trim(); }
+    catch(e){ return ""; }
+  }
+  // NO se guarda ningun numero de mesa en el telefono. Se probo hacerlo y es
+  // peor: al que abria la carta sin QR le aparecia el numero de la otra vez ya
+  // escrito, tocaba "Aceptar" sin leer, y el mozo iba a la mesa equivocada.
+  function mostrarMesa(){
+    // El cartelito de la mesa solo se muestra si se escaneo el QR de la mesa.
+    var m = mesaDelQR(), el = document.getElementById("mozoMesa");
+    if (!el) return;
+    if (m) { el.textContent = "Mesa " + m; el.style.display = "inline-block"; }
+    else { el.textContent = ""; el.style.display = "none"; }
+  }
+  function mozoAviso(txt, ms){
+    var el = document.getElementById("mozoMsg");
+    if (!el) return;
+    el.textContent = txt; el.style.display = "block";
+    clearTimeout(window._mozoT);
+    window._mozoT = setTimeout(function(){ el.style.display = "none"; }, ms || 4500);
+  }
+  function llamar(tipo){
+    var mesa = mesaDelQR();
+    if (!mesa) {
+      var escrito = null;
+      // El casillero arranca VACIO a proposito: que lo escriba quien esta sentado.
+      try{ escrito = prompt("¿En qué mesa estás? Escribí el número:", ""); }catch(e){ escrito = null; }
+      mesa = String(escrito == null ? "" : escrito).replace(/[^0-9A-Za-z- ]/g,"").slice(0,10).trim();
+      if (!mesa) {
+        // Si se arrepintio o el navegador bloqueo la pregunta, se lo dice: antes
+        // el boton no hacia nada y el cliente tocaba cinco veces al pedo.
+        mozoAviso(escrito === null
+          ? "Para avisarle al mozo necesito saber en qué mesa estás. Escaneá el QR de tu mesa."
+          : "Escribí el número de tu mesa para poder avisarle al mozo.", 6000);
+        return;
+      }
+      var elm = document.getElementById("mozoMesa");
+      if (elm) { elm.textContent = "Mesa " + mesa; elm.style.display = "inline-block"; }
+    }
+    var b = document.getElementById(tipo === "cuenta" ? "mozoCuenta" : "mozoMozo");
+    var textoOriginal = b ? b.innerHTML : "";
+    if (b) { b.disabled = true; b.innerHTML = "Avisando…"; }
+    fetch(MOZO_URL + "/llamar", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ local: MOZO_LOCAL, mesa: mesa, tipo: tipo })
+    }).then(function(r){ return r.json(); }).then(function(j){
+      if (j && j.ok) {
+        if (b) { b.classList.add("mozo-ok"); b.innerHTML = "✓ Avisado"; }
+        mozoAviso(tipo === "cuenta" ? "Listo, ya avisamos que pedís la cuenta." : "Listo, el mozo ya fue avisado. Ahí va.");
+        setTimeout(function(){ if (b) { b.disabled = false; b.classList.remove("mozo-ok"); b.innerHTML = textoOriginal; } }, 30000);
+      } else if (j && j.error === "demasiados-llamados") {
+        if (b) { b.disabled = false; b.innerHTML = textoOriginal; }
+        mozoAviso("Hubo muchos llamados seguidos. Esperá un momento o avisale a un mozo.");
+      } else {
+        if (b) { b.disabled = false; b.innerHTML = textoOriginal; }
+        mozoAviso("No pudimos avisar desde acá. Llamá a un mozo con la mano.");
+      }
+    }).catch(function(){
+      if (b) { b.disabled = false; b.innerHTML = textoOriginal; }
+      mozoAviso("Sin conexión para avisar. Llamá a un mozo con la mano.");
+    });
+  }
+  mostrarMesa();
 
   var PED_URL = "https://buzon-tmventas.contacto-tmventas.workers.dev", PED_LOCAL = "714sb3rgzg6aqio9x9";
   var PED_LOCALNOM = "Don Pepe";
