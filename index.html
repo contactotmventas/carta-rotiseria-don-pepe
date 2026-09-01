@@ -8,10 +8,12 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;700&family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
-  :root{ --azul:#8b0e0e; --azulo:#5a0909; --tinta:#2b2b2b; }
+  :root{ --azul:#8b0e0e; --azulo:#5a0909; --tinta:#2b2b2b; --suave:#5a0909;
+         --papel:#F4F5F3; --papel-rgb:244,245,243;
+         --fcuerpo:'Montserrat',system-ui,sans-serif; --ftitulo:'Caveat',cursive; --tf:1; }
   *{ box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
   body{
-    font-family:'Montserrat',system-ui,sans-serif;
+    font-family:var(--fcuerpo);
     color:var(--tinta);
     background:#F4F5F3;
     min-height:100vh;
@@ -26,13 +28,13 @@
     display:flex;align-items:center;justify-content:center;
     box-shadow:0 6px 22px rgba(0,0,0,.28);
   }
-  .marca b{ font-family:'Montserrat';font-weight:800;color:#fff;font-size:42px;letter-spacing:-2px; }
+  .marca b{ font-family:var(--fcuerpo);font-weight:800;color:#fff;font-size:42px;letter-spacing:-2px; }
   .marca-img{ width:100%;height:100%;border-radius:50%;object-fit:cover; }
   .hero h1{
-    font-family:'Caveat',cursive;font-weight:700;color:var(--azul);
-    font-size:46px;line-height:.9;
+    font-family:var(--ftitulo);font-weight:700;color:var(--azul);
+    font-size:calc(46px * var(--tf));line-height:1;
   }
-  .hero p{ color:var(--azulo);opacity:.7;font-size:13px;margin-top:6px;letter-spacing:.5px; }
+  .hero p{ color:var(--suave);opacity:.7;font-size:13px;margin-top:6px;letter-spacing:.5px; }
 
   /* Próximos eventos */
   .eventos{
@@ -43,8 +45,8 @@
     border-radius:16px;
   }
   .ev-cabecera{
-    text-align:center;font-family:'Caveat',cursive;font-weight:700;
-    color:var(--azul);font-size:28px;margin-bottom:12px;line-height:1;
+    text-align:center;font-family:var(--ftitulo);font-weight:700;
+    color:var(--azul);font-size:calc(28px * var(--tf));margin-bottom:12px;line-height:1.05;
   }
   .ev-item{
     padding:10px 0;
@@ -52,19 +54,19 @@
   }
   .ev-item:first-of-type{ border-top:none; }
   .ev-fecha{
-    font-family:'Montserrat';font-weight:700;font-size:12px;
+    font-family:var(--fcuerpo);font-weight:700;font-size:12px;
     color:#B429C9;text-transform:capitalize;letter-spacing:.3px;
   }
   .ev-titulo{
-    font-family:'Caveat',cursive;font-weight:700;
-    color:var(--azul);font-size:24px;line-height:1.05;margin-top:1px;
+    font-family:var(--ftitulo);font-weight:700;
+    color:var(--azul);font-size:calc(24px * var(--tf));line-height:1.1;margin-top:1px;
   }
-  .ev-detalle{ font-size:14px;color:var(--azulo);opacity:.8;margin-top:2px; }
+  .ev-detalle{ font-size:14px;color:var(--suave);opacity:.8;margin-top:2px; }
 
   nav.chips{
     position:sticky;top:0;z-index:10;
     display:flex;gap:8px;overflow-x:auto;padding:12px 22px;
-    background:rgba(222,219,212,.92);backdrop-filter:blur(6px);
+    background:rgba(var(--papel-rgb),.92);backdrop-filter:blur(6px);
     border-bottom:1px solid rgba(46,90,134,.18);
     scrollbar-width:none;
   }
@@ -78,12 +80,12 @@
 
   .pagina{ padding:26px 0 8px; scroll-margin-top:64px; }
   .titulo{
-    font-family:'Caveat',cursive;font-weight:700;color:var(--azul);
-    font-size:42px;line-height:1;margin-bottom:6px;
+    font-family:var(--ftitulo);font-weight:700;color:var(--azul);
+    font-size:calc(42px * var(--tf));line-height:1.05;margin-bottom:6px;
   }
   .titulo .punto{ color:var(--azul); }
   .sub{
-    font-family:'Montserrat';font-weight:800;color:var(--azulo);
+    font-family:var(--fcuerpo);font-weight:800;color:var(--azulo);
     font-size:17px;letter-spacing:1px;margin:20px 0 4px;
     display:inline-block;
   }
@@ -92,21 +94,21 @@
     background:var(--azul);border-radius:2px;opacity:.85;
   }
   .nota{
-    color:var(--azulo);opacity:.78;font-size:12.5px;font-style:italic;
+    color:var(--suave);opacity:.78;font-size:12.5px;font-style:italic;
     margin:2px 0 8px;line-height:1.4;
   }
   .filas{ margin-top:6px; }
   .fila{ display:flex;align-items:flex-end;gap:6px;padding:5px 0; }
   .fnom{ display:flex;flex-direction:column;min-width:0;flex:0 1 auto; }
   .nom{ font-weight:700;font-size:14.5px;color:var(--tinta);text-transform:uppercase;letter-spacing:.2px;line-height:1.15; }
-  .desc{ font-weight:400;font-size:12px;color:#6a6a66;text-transform:none;letter-spacing:0;margin-top:1px; }
-  .dots{ flex:1;border-bottom:2px dotted rgba(46,90,134,.5);transform:translateY(-4px);min-width:18px; }
+  .desc{ font-weight:400;font-size:12px;color:var(--tinta);opacity:.66;text-transform:none;letter-spacing:0;margin-top:1px; }
+  .dots{ flex:1;border-bottom:2px dotted var(--azul);opacity:.5;transform:translateY(-4px);min-width:18px; }
   .precio{ font-weight:800;font-size:15px;color:var(--azul);white-space:nowrap; }
-  .fila.agotado .nom{ color:#a99;text-decoration:line-through; }
-  .fila.agotado .precio{ color:#bbb; }
+  .fila.agotado .nom{ color:var(--tinta);opacity:.45;text-decoration:line-through; }
+  .fila.agotado .precio{ color:var(--tinta);opacity:.35; }
   .ag{ font-size:10px;background:#C0455A;color:#fff;padding:1px 6px;border-radius:6px;vertical-align:middle;text-decoration:none;display:inline-block;letter-spacing:.5px; }
 
-  .ig{ text-align:center;font-family:'Caveat',cursive;font-size:22px;color:var(--azul);opacity:.8;padding:24px 0 6px; }
+  .ig{ text-align:center;font-family:var(--ftitulo);font-size:calc(22px * var(--tf));color:var(--azul);opacity:.8;padding:24px 0 6px; }
 
   @media (prefers-reduced-motion: no-preference){
     .pagina{ animation:sube .5s both; }
@@ -127,11 +129,11 @@
     border-radius:26px; padding:40px 28px; max-width:430px; width:100%;
     box-shadow:0 12px 40px rgba(0,0,0,.35);
   }
-  .port-tit{ font-family:'Montserrat';font-weight:800;color:#fff;font-size:30px;letter-spacing:-1px;margin-top:10px;line-height:1.1; }
+  .port-tit{ font-family:var(--fcuerpo);font-weight:800;color:#fff;font-size:30px;letter-spacing:-1px;margin-top:10px;line-height:1.1; }
   .port-sub{ color:rgba(255,255,255,.82);font-size:12px;letter-spacing:4px;margin-bottom:30px; }
   .port-botones{ display:flex;flex-direction:column;gap:14px; }
   .port-btn{
-    font-family:'Montserrat';font-weight:700;font-size:18px;
+    font-family:var(--fcuerpo);font-weight:700;font-size:18px;
     padding:18px 16px;border:none;border-radius:16px;cursor:pointer;
     background:#fff;color:#1E3F61;
     box-shadow:0 6px 20px rgba(0,0,0,.28);
@@ -143,14 +145,14 @@
   .volver{
     position:sticky;top:0;z-index:20;width:100%;display:block;
     background:var(--azulo);color:#fff;border:none;padding:13px;
-    font-family:'Montserrat';font-weight:600;font-size:14px;cursor:pointer;letter-spacing:.3px;
+    font-family:var(--fcuerpo);font-weight:600;font-size:14px;cursor:pointer;letter-spacing:.3px;
   }
   .volver:active{ filter:brightness(1.15); }
   .marca.chica{ width:62px;height:62px;margin-bottom:10px; }
   .marca.chica b{ font-size:27px; }
 
   /* ---- Carta del Bar: fotos oficiales ---- */
-  .fotos-wrap{ max-width:560px; margin:0 auto; background:#ece7dd; }
+  .fotos-wrap{ max-width:560px; margin:0 auto; background:var(--papel); }
   .foto-carta{ display:block; width:100%; height:auto; }
 
   /* ---- Pie de marca: "menú digital por TM Ventas" ---- */
@@ -161,7 +163,7 @@
   }
   .tm-pie .tm-logo{ height:30px; width:auto; opacity:.96; }
   .tm-pie span{
-    font-family:'Montserrat',sans-serif; font-size:10.5px; letter-spacing:2px;
+    font-family:var(--fcuerpo); font-size:10.5px; letter-spacing:2px;
     text-transform:uppercase; color:#7de8a6; opacity:.85;
   }
 
