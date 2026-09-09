@@ -323,20 +323,44 @@
   // pagina, asi que se busca con cuidado: nada de romperse por un id que falta.
   function _sec(id){ return document.getElementById(id); }
   function _ver(id, si){ var e = _sec(id); if (e) e.style.display = si ? "block" : "none"; }
-  function verCarta(cual){
+  function verCarta(cual, sinTocarLaDireccion){
     var p = _sec("portada"); if (p) p.style.display = "none";
     _ver("cartaBar", cual === "bar");
     _ver("cartaTragos", cual === "tragos");
     _ver("cartaEventos", cual === "eventos");
+    if (!sinTocarLaDireccion) _direccion("#" + cual);
     window.scrollTo(0, 0);
   }
-  function verPortada(){
+  function verPortada(sinTocarLaDireccion){
     var p = _sec("portada"); if (p) p.style.display = "flex";
     _ver("cartaBar", false);
     _ver("cartaTragos", false);
     _ver("cartaEventos", false);
+    if (!sinTocarLaDireccion) _direccion(" ");
     window.scrollTo(0, 0);
   }
+  // ── CADA CARTA TIENE SU PROPIA DIRECCION (1.228.0) ───────────────────────
+  // Antes la carta era UNA sola direccion: se abria en la portada y habia que
+  // tocar un boton. Un QR pegado en la mesa que diga "carta de tragos" tiene
+  // que llevar A LA CARTA DE TRAGOS, no a la portada. Ahora cada seccion tiene
+  // su direccion —…/#tragos, …/#bar, …/#eventos— y se puede apuntar un QR, un
+  // link de Instagram o un mensaje de WhatsApp derecho a la que uno quiere.
+  // Y de paso el boton "atras" del celular vuelve a la portada, que es lo que
+  // todo el mundo espera.
+  function _direccion(h){
+    try { history.replaceState(null, "", h === " " ? location.pathname + location.search : h); } catch (e) {}
+  }
+  function _porLaDireccion(sinTocarLaDireccion){
+    var h = String(location.hash || "").replace("#", "").toLowerCase();
+    if (h === "tragos" || h === "bar" || h === "eventos") {
+      // Solo si esa seccion existe en esta carta: un #tragos en un comercio que
+      // no tiene tragos dejaria la pantalla en blanco.
+      if (_sec("carta" + h.charAt(0).toUpperCase() + h.slice(1))) { verCarta(h, sinTocarLaDireccion); return; }
+    }
+    verPortada(sinTocarLaDireccion);
+  }
+  _porLaDireccion(true);
+  window.addEventListener("hashchange", function(){ _porLaDireccion(true); });
 
   var MOZO_URL = "https://buzon-tmventas.contacto-tmventas.workers.dev", MOZO_LOCAL = "714sb3rgzg6aqio9x9";
   // La mesa vale SOLO si viene en la direccion, o sea si se escaneo el QR de esa
